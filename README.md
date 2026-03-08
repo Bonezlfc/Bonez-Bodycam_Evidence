@@ -1,6 +1,6 @@
 # bonez-bodycam_evidence
 
-Court-grade bodycam evidence recording and playback addon for [Bonez-Bodycam](../Bonez-Bodycam/README.md).
+Court-grade bodycam evidence recording and playback addon for [Bonez-Bodycam](https://github.com/Bonezlfc/Bonez-Bodycam).
 
 Clips are recorded automatically based on active ERS events and weapon discharge. Video is encoded in the client and uploaded to [Fivemanage](https://fivemanage.com). Authorized staff can search, watch, and manage footage through an in-game evidence viewer — no external tools required.
 
@@ -24,7 +24,7 @@ When a recording trigger fires, this resource calls `exports['Bonez-Bodycam']:se
 | Dependency | Notes |
 |---|---|
 | [`Bonez-Bodycam`](../Bonez-Bodycam/README.md) | Required — overlay and unit ID source |
-| [`night_ers`](https://github.com/night-scripts/night_ers) | Required — callout and tracking state |
+| [`night_ers`](https://store.nights-software.com/category/ersgamemode) | Required — callout and tracking state |
 | [`NativeUI`](https://github.com/FrazzIe/NativeUILua) | Required — in-game evidence browser menu |
 | [`oxmysql`](https://github.com/overextended/oxmysql) | **Optional but strongly recommended** — persistent MySQL storage; without it clips are stored in server KVP and are lost on resource restart |
 | [Fivemanage](https://fivemanage.com) | Required — video hosting; you need an account and a Video API key |
@@ -35,7 +35,7 @@ When a recording trigger fires, this resource calls `exports['Bonez-Bodycam']:se
 
 ### 1. Install Bonez-Bodycam first
 
-Follow the [Bonez-Bodycam installation guide](../Bonez-Bodycam/README.md). Both resources must be configured and running before this addon will work.
+Follow the [Bonez-Bodycam installation guide](https://github.com/Bonezlfc/Bonez-Bodycam/blob/main/README.md). Both resources must be configured and running before this addon will work.
 
 ### 2. Copy the resource
 
