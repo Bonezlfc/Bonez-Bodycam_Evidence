@@ -70,10 +70,12 @@ local function GetUnitIdentifier(src)
 end
 
 -- ── In-flight clip sessions ───────────────────────────────────────────────
--- Structure: { [clipId] = { unitId, trigger, serviceType, startTime, src } }
+-- Structure: { [clipId] = { unitId, trigger, serviceType, startTime, src, playerName } }
 local activeSessions = {}
 
 -- ── Event: client requests a new clip to be created ──────────────────────
+-- trigger     — 'CALLOUT' | 'TRACKING' | 'WEAPON_FIRED' | 'MANUAL'
+-- serviceType — active service label (e.g. 'POLICE')
 RegisterNetEvent('bonez-bodycam_evidence:startClip')
 AddEventHandler('bonez-bodycam_evidence:startClip', function(trigger, serviceType)
     local src = source
@@ -81,9 +83,10 @@ AddEventHandler('bonez-bodycam_evidence:startClip', function(trigger, serviceTyp
     if not trigger then return end
     trigger     = tostring(trigger):upper()
     serviceType = tostring(serviceType or 'UNKNOWN'):upper()
-    local unitId = GetUnitIdentifier(src)
+    local unitId     = GetUnitIdentifier(src)
+    local playerName = GetPlayerName(src) or ''
 
-    local clipId   = GenerateUUID()
+    local clipId    = GenerateUUID()
     local startTime = os.time()
 
     activeSessions[clipId] = {
@@ -92,23 +95,25 @@ AddEventHandler('bonez-bodycam_evidence:startClip', function(trigger, serviceTyp
         trigger     = trigger,
         serviceType = serviceType,
         startTime   = startTime,
+        playerName  = playerName,
     }
 
     local clipRecord = {
-        clipId      = clipId,
-        unitId      = unitId,
-        trigger     = trigger,
-        serviceType = serviceType,
-        startTime   = startTime,
+        clipId       = clipId,
+        unitId       = unitId,
+        trigger      = trigger,
+        serviceType  = serviceType,
+        startTime    = startTime,
         uploadStatus = 'pending',
         uploadType   = 'MP4',
+        playerName   = playerName,
     }
 
     Storage.CreateClip(clipRecord)
 
     print(string.format(
-        '^2[BCE] Clip START → id: %s | unit: %s | trigger: %s | service: %s | src: %s^7',
-        clipId, tostring(unitId), trigger, serviceType, tostring(src)
+        '^2[BCE] Clip START → id: %s | unit: %s | player: %s | trigger: %s | service: %s | src: %s^7',
+        clipId, tostring(unitId), playerName, trigger, serviceType, tostring(src)
     ))
 
     -- ACK back to client with assigned clipId
@@ -162,6 +167,9 @@ AddEventHandler('bonez-bodycam_evidence:clipCaptureComplete', function(clipId, t
 end)
 
 -- ── Event: client requests clips for a unit ───────────────────────────────
+-- targetUnitId may be an exact unit ID OR a free-text search query.
+-- The storage layer tries an exact match first, then falls back to a
+-- partial search across unitId, callsign, and playerName.
 RegisterNetEvent('bonez-bodycam_evidence:requestClips')
 AddEventHandler('bonez-bodycam_evidence:requestClips', function(targetUnitId)
     local src = source
@@ -170,8 +178,13 @@ AddEventHandler('bonez-bodycam_evidence:requestClips', function(targetUnitId)
         return
     end
 
-    Storage.GetClipsForUnit(targetUnitId, function(clips)
-        -- clips already filtered to safe fields by storage layer
+    local query = tostring(targetUnitId or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    if query == '' then
+        TriggerClientEvent('bonez-bodycam_evidence:receiveClips', src, {})
+        return
+    end
+
+    Storage.SearchClips(query, function(clips)
         TriggerClientEvent('bonez-bodycam_evidence:receiveClips', src, clips or {})
     end)
 end)

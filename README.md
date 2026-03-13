@@ -1,6 +1,6 @@
 # bonez-bodycam_evidence
 
-Court-grade bodycam evidence recording and playback addon for [Bonez-Bodycam](https://github.com/Bonezlfc/Bonez-Bodycam).
+Court-grade bodycam evidence recording and playback addon for [Bonez-Bodycam](../Bonez-Bodycam/README.md).
 
 Clips are recorded automatically based on active ERS events and weapon discharge. Video is encoded in the client and uploaded to [Fivemanage](https://fivemanage.com). Authorized staff can search, watch, and manage footage through an in-game evidence viewer — no external tools required.
 
@@ -24,7 +24,7 @@ When a recording trigger fires, this resource calls `exports['Bonez-Bodycam']:se
 | Dependency | Notes |
 |---|---|
 | [`Bonez-Bodycam`](../Bonez-Bodycam/README.md) | Required — overlay and unit ID source |
-| [`night_ers`](https://store.nights-software.com/category/ersgamemode) | Required — callout and tracking state |
+| [`night_ers`](https://github.com/night-scripts/night_ers) | Required — callout and tracking state |
 | [`NativeUI`](https://github.com/FrazzIe/NativeUILua) | Required — in-game evidence browser menu |
 | [`oxmysql`](https://github.com/overextended/oxmysql) | **Optional but strongly recommended** — persistent MySQL storage; without it clips are stored in server KVP and are lost on resource restart |
 | [Fivemanage](https://fivemanage.com) | Required — video hosting; you need an account and a Video API key |
@@ -35,7 +35,7 @@ When a recording trigger fires, this resource calls `exports['Bonez-Bodycam']:se
 
 ### 1. Install Bonez-Bodycam first
 
-Follow the [Bonez-Bodycam installation guide](https://github.com/Bonezlfc/Bonez-Bodycam/blob/main/README.md). Both resources must be configured and running before this addon will work.
+Follow the [Bonez-Bodycam installation guide](../Bonez-Bodycam/README.md). Both resources must be configured and running before this addon will work.
 
 ### 2. Copy the resource
 
@@ -71,7 +71,7 @@ To get a key:
 
 ### 5. Configure job permissions
 
-Open `config.lua` and set your job names. These must exactly match what your framework (ESX or QBCore) returns — both are auto-detected:
+Open `config.lua` and set your job names. These must exactly match what your framework and/or discord ace perms (ESX or QBCore) returns — both are auto-detected:
 
 ```lua
 -- Players with these jobs can VIEW evidence clips
@@ -113,11 +113,14 @@ All settings are in `config.lua`.
 | `Config.Debug` | `false` | Print state transitions and upload events to the F8 / txAdmin console. |
 | `Config.DefaultKey` | `F9` | Default keybind to open the evidence menu. Players can rebind in FiveM Settings → Key Bindings. |
 | `Config.MenuCommand` | `evidence` | Chat command to open the evidence menu. |
+| `Config.ManualRecordingMode` | `false` | Controls auto-triggers only. `false` (default) = auto-triggers + manual key both active. `true` = auto-triggers disabled, manual key only. The manual key always works regardless of this setting. |
+| `Config.ManualRecordCommand` | `evidencerec` | Command name for the manual record start/stop key. |
+| `Config.ManualRecordKey` | `F6` | Default keybind for manual record start/stop. Always active. Rebindable in FiveM Settings → Key Bindings. |
 | `Config.ERSPollInterval` | `500` | Milliseconds between ERS state polls. |
 | `Config.TrackingCooldown` | `60` | Seconds of grace period after tracking ends before the clip is finalized. If tracking resumes within this window, recording continues. |
 | `Config.WeaponClipDuration` | `60` | How long (seconds) a weapon-discharge clip records before auto-stopping. |
 | `Config.ClipsPerUnit` | `20` | Maximum clips stored per unit. Oldest clips are automatically deleted (from both the database and Fivemanage) when exceeded. |
-| `Config.UnitIdentifierType` | `discord` | Which player identifier to tag clips with. Options: `fivem`, `discord`, `license`, `steam`, `xbl`, `live`. |
+| `Config.UnitIdentifierType` | `discord` | Which player identifier to tag clips with. Options: `fivem`, `discord`, `license`, `steam`, `xbl`, `live`. This only controls which ID is *stored* — searching always works across unit ID, callsign, and player name regardless of this setting. |
 | `Config.AuthorizedJobs` | see file | Jobs that can view evidence. |
 | `Config.AdminJobs` | see file | Jobs that can delete evidence. |
 
@@ -125,7 +128,9 @@ All settings are in `config.lua`.
 
 ## How Recording Works
 
-Clips are triggered automatically — no player action required. The player must be **on shift** in ERS for any trigger to fire.
+Clips are triggered automatically based on ERS events and weapon fire, **and** the player can always start or stop a clip manually with the record key (default **F10**, rebindable). This means a traffic stop, interview, or any other situation that doesn't constitute a callout can still be recorded — just press the key.
+
+Set `Config.ManualRecordingMode = true` to disable the automatic triggers entirely, leaving only the manual key. Useful for servers that want full officer control over what gets recorded. A `MANUAL` trigger type is stored with each manually started clip.
 
 ### Trigger 1 — Callout (highest priority)
 
@@ -156,8 +161,11 @@ Open the menu in-game with the keybind (default **F9**) or the chat command (def
 
 ### Menu flow
 
-1. **Search by Unit ID** — enter the unit's identifier to load their clips
-2. **Browse Clips** — lists all clips for that unit, newest first, with trigger type, date, and status
+1. **Search** — enter any of the following to load matching clips:
+   - **Unit ID** — the stored player identifier (fivem, discord, etc. — set by `Config.UnitIdentifierType`)
+   - **Player name** — the player's in-game display name
+   - Partial matches are supported — you do not need an exact or full value
+2. **Browse Clips** — lists all matching clips, newest first, with trigger type, date, and status
 3. Select a clip → **Watch Footage** — opens the fullscreen viewer with the video and clip metadata
 4. **Export Clip Info to Chat** — prints clip metadata to your local chat log
 5. **[Admin] Delete Clip** — permanently removes the clip from the database and Fivemanage

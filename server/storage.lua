@@ -28,12 +28,23 @@ AddEventHandler('onResourceStart', function(name)
                     fivemanageUrl TEXT,
                     uploadStatus  VARCHAR(20)  DEFAULT 'pending',
                     uploadType    VARCHAR(20)  DEFAULT 'MP4',
+                    playerName    VARCHAR(100),
+                    callsign      VARCHAR(50),
                     createdAt     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
                 )
             ]], {})
             -- Migrate unitId column from INT to VARCHAR for existing installs
             exports.oxmysql:execute(
                 'ALTER TABLE bodycam_evidence MODIFY COLUMN unitId VARCHAR(120) NOT NULL',
+                {}
+            )
+            -- Migrate: add playerName and callsign columns for existing installs
+            exports.oxmysql:execute(
+                "ALTER TABLE bodycam_evidence ADD COLUMN IF NOT EXISTS playerName VARCHAR(100)",
+                {}
+            )
+            exports.oxmysql:execute(
+                "ALTER TABLE bodycam_evidence ADD COLUMN IF NOT EXISTS callsign VARCHAR(50)",
                 {}
             )
             print('^2[bonez-bodycam_evidence] Storage: oxmysql^0')
@@ -79,9 +90,10 @@ function Storage.CreateClip(clip)
     if useMySQL then
         exports.oxmysql:execute(
             [[INSERT INTO bodycam_evidence
-              (clipId, unitId, triggerType, serviceType, startTime, uploadStatus, uploadType)
-              VALUES (?, ?, ?, ?, ?, 'pending', 'MP4')]],
-            { clip.clipId, clip.unitId, clip.trigger, clip.serviceType, clip.startTime }
+              (clipId, unitId, triggerType, serviceType, startTime, uploadStatus, uploadType, playerName, callsign)
+              VALUES (?, ?, ?, ?, ?, 'pending', 'MP4', ?, ?)]],
+            { clip.clipId, clip.unitId, clip.trigger, clip.serviceType, clip.startTime,
+              clip.playerName or '', clip.callsign or nil }
         )
     else
         KvpSetClip(clip)
@@ -167,6 +179,65 @@ function Storage.GetClipsForUnit(unitId, cb)
         -- Sort newest first
         table.sort(clips, function(a, b) return (a.startTime or 0) > (b.startTime or 0) end)
         cb(clips)
+    end
+end
+
+-- Search clips by unitId, callsign, or playerName (partial, case-insensitive).
+-- Returns the most-recent Config.ClipsPerUnit matches.
+function Storage.SearchClips(query, cb)
+    if useMySQL then
+        local pattern = '%' .. tostring(query) .. '%'
+        exports.oxmysql:execute(
+            [[SELECT clipId, unitId, triggerType AS `trigger`, serviceType, startTime, endTime,
+                     duration, totalFrames, fivemanageUrl, uploadStatus, playerName, callsign
+              FROM bodycam_evidence
+              WHERE unitId LIKE ? OR callsign LIKE ? OR playerName LIKE ?
+              ORDER BY startTime DESC LIMIT ?]],
+            { pattern, pattern, pattern, Config.ClipsPerUnit },
+            function(rows) cb(rows or {}) end
+        )
+    else
+        -- KVP: scan all clip keys and filter in Lua
+        local q    = tostring(query):lower()
+        local all  = {}
+        local h    = StartFindKvp(KVP_PREFIX_CLIP)
+        if h ~= -1 then
+            while true do
+                local key = FindKvp(h)
+                if not key then break end
+                local raw = GetResourceKvpString(key)
+                if raw then
+                    local clip = json.decode(raw)
+                    if clip then
+                        local unitMatch = tostring(clip.unitId or ''):lower():find(q, 1, true)
+                        local csMatch   = clip.callsign   and tostring(clip.callsign):lower():find(q, 1, true)
+                        local nameMatch = clip.playerName and tostring(clip.playerName):lower():find(q, 1, true)
+                        if unitMatch or csMatch or nameMatch then
+                            table.insert(all, {
+                                clipId        = clip.clipId,
+                                unitId        = clip.unitId,
+                                trigger       = clip.trigger,
+                                serviceType   = clip.serviceType,
+                                startTime     = clip.startTime,
+                                endTime       = clip.endTime,
+                                duration      = clip.duration,
+                                totalFrames   = clip.totalFrames,
+                                fivemanageUrl = clip.fivemanageUrl,
+                                uploadStatus  = clip.uploadStatus,
+                                playerName    = clip.playerName,
+                                callsign      = clip.callsign,
+                            })
+                        end
+                    end
+                end
+            end
+            EndFindKvp(h)
+        end
+        table.sort(all, function(a, b) return (a.startTime or 0) > (b.startTime or 0) end)
+        -- Trim to cap
+        local trimmed = {}
+        for i = 1, math.min(#all, Config.ClipsPerUnit) do trimmed[i] = all[i] end
+        cb(trimmed)
     end
 end
 

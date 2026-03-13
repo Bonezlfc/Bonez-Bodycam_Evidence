@@ -81,6 +81,8 @@ local function TransitionToRecording(trigger)
     currentTrigger = trigger
     cooldownActive = false
     DebugPrint('CLIENT', 'STATE → RECORDING | trigger: ' .. tostring(trigger))
+    -- Notify bonez-bodycam to play the "recording started" sound
+    pcall(function() exports['bonez-bodycam']:playRecordSound(true) end)
     -- Recorder.Start is called once server ACKs with clipId (see event handler below)
     local svc = GetServiceType()
     RequestClipStart(trigger, svc)
@@ -97,6 +99,9 @@ local function TransitionToFinalizing()
     currentTrigger = nil
     cooldownActive = false
     weaponTimerActive = false
+
+    -- Notify bonez-bodycam to play the "recording stopped" sound
+    pcall(function() exports['bonez-bodycam']:playRecordSound(false) end)
 
     Recorder.Stop()
     -- IDLE transition happens when server ACKs receipt (bonez-bodycam_evidence:chunksDone)
@@ -209,19 +214,22 @@ Citizen.CreateThread(function()
             prevTrackingUnit    = ersTrackingUnit
 
             -- Read current
-            ersOnShift         = GetERSExport('getIsPlayerOnShift',         false)
+            ersOnShift         = GetERSExport('getIsPlayerOnShift',           false)
             ersAttachedCallout = GetERSExport('getIsPlayerAttachedToCallout', false)
-            ersTrackingUnit    = GetERSExport('getIsPlayerTrackingUnit',     false)
+            ersTrackingUnit    = GetERSExport('getIsPlayerTrackingUnit',       false)
 
-            HandleERSChanges()
-            CheckCooldown()
+            -- Auto-triggers only run when not in manual recording mode
+            if not Config.ManualRecordingMode then
+                HandleERSChanges()
+                CheckCooldown()
 
-            -- Auto-overlay: ON while on shift + (callout or tracking), OFF otherwise
-            SetBodycamOverlay(ersOnShift and (ersAttachedCallout or ersTrackingUnit))
+                -- Auto-overlay: ON while on shift + (callout or tracking), OFF otherwise
+                SetBodycamOverlay(ersOnShift and (ersAttachedCallout or ersTrackingUnit))
+            end
         end
 
         -- If not on shift, don't hold an active recording, and kill the overlay
-        if not ersOnShift then
+        if not ersOnShift and not Config.ManualRecordingMode then
             SetBodycamOverlay(false)
             if currentState ~= STATE_IDLE and currentState ~= STATE_FINALIZING then
                 TransitionToFinalizing()
@@ -230,10 +238,10 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ── Weapon detection thread (per-frame, only in IDLE) ─────────────────────
+-- ── Weapon detection thread (per-frame, only in IDLE, only in auto mode) ──
 Citizen.CreateThread(function()
     while true do
-        if currentState == STATE_IDLE and ersOnShift and ersAvailable and bodycamAvailable then
+        if not Config.ManualRecordingMode and currentState == STATE_IDLE and ersOnShift and ersAvailable and bodycamAvailable then
             Citizen.Wait(0)
             local ped = PlayerPedId()
             if IsPedShooting(ped) then
@@ -295,6 +303,65 @@ RegisterCommand(Config.MenuCommand, function()
 end, false)
 
 RegisterKeyMapping(Config.MenuCommand, 'Open Evidence System', 'keyboard', Config.DefaultKey)
+
+-- ── Manual recording start / stop command ─────────────────────────────────
+-- Only active when Config.ManualRecordingMode = true.
+
+RegisterCommand(Config.ManualRecordCommand, function()
+    -- Manual key always works regardless of ManualRecordingMode.
+    -- ManualRecordingMode only controls whether auto-triggers fire.
+    if not bodycamAvailable then
+        DebugPrint('CLIENT', 'ManualRec pressed but bonez-bodycam unavailable')
+        return
+    end
+
+    -- Allow stopping an active clip off-duty, but block starting a new one
+    if currentState == STATE_IDLE and not ersOnShift then
+        DebugPrint('CLIENT', 'ManualRec blocked — not on shift')
+        return
+    end
+
+    if currentState == STATE_IDLE then
+        -- Start a manual clip (e.g. traffic stop — no callout/tracking active)
+        TransitionToRecording('MANUAL')
+    elseif currentState == STATE_RECORDING or currentState == STATE_COOLDOWN then
+        -- Stop the current clip (manual override — works on any trigger type)
+        TransitionToFinalizing()
+    end
+end, false)
+
+RegisterKeyMapping(
+    Config.ManualRecordCommand,
+    'Evidence: Start / Stop Recording',
+    'keyboard',
+    Config.ManualRecordKey
+)
+
+-- ── Exports ────────────────────────────────────────────────────────────────
+
+-- Queried by bonez-bodycam every 500 ms to decide whether to show the overlay.
+-- Returns true during RECORDING and COOLDOWN (clip is still live during cooldown).
+exports('isRecording', function()
+    return currentState == STATE_RECORDING or currentState == STATE_COOLDOWN
+end)
+
+-- Called by bonez-bodycam's overlay toggle (]) to start a MANUAL clip.
+-- No-op if already recording or player is not on shift.
+exports('startManualRecord', function()
+    if not bodycamAvailable then return end
+    if not ersOnShift then return end
+    if currentState == STATE_IDLE then
+        TransitionToRecording('MANUAL')
+    end
+end)
+
+-- Called by bonez-bodycam's overlay toggle (]) to stop the current clip.
+-- Works regardless of what trigger started it.
+exports('stopManualRecord', function()
+    if currentState == STATE_RECORDING or currentState == STATE_COOLDOWN then
+        TransitionToFinalizing()
+    end
+end)
 
 -- ── Resource init ─────────────────────────────────────────────────────────
 AddEventHandler('onClientResourceStart', function(resourceName)

@@ -12,6 +12,17 @@ Config.Debug = false
 Config.DefaultKey   = 'F9'       -- Default key for /evidence command (rebindable in FiveM Settings)
 Config.MenuCommand  = 'evidence' -- In-game chat command to open the evidence system
 
+-- ── Manual Recording ────────────────────────────────────────────────────────
+-- The manual record key (default F10) ALWAYS works regardless of ManualRecordingMode.
+-- Use it to record traffic stops, interviews, or any situation that isn't a callout.
+--
+-- Config.ManualRecordingMode controls whether AUTO-TRIGGERS also fire:
+--   false (default) — auto-triggers ON  + manual key ON  (recommended)
+--   true            — auto-triggers OFF + manual key only (fully manual server)
+Config.ManualRecordingMode = false
+Config.ManualRecordCommand = 'evidencerec'  -- command name for manual start/stop
+Config.ManualRecordKey     = 'F6'           -- default keybind (rebindable in FiveM Settings)
+
 -- ── ERS polling ────────────────────────────────────────────────────────────
 Config.ERSPollInterval = 500  -- ms between night_ers state polls
 
@@ -52,6 +63,8 @@ Config.UnitIdentifierType = 'discord'
 -- This is stored with every clip for evidence records.
 --
 -- Pick ONE option and uncomment it. Delete the others.
+-- Tip: Option D uses the bonez-bodycam GetActiveServiceType() helper which
+-- already respects both ERS data and the player's manual service type setting.
 Config.GetServiceType = function()
 
     -- Option A — Static value (simplest). Replace with your department name.

@@ -32,6 +32,14 @@ server_scripts {
 
 ui_page 'html/index.html'
 
+-- Allow the NUI page to fetch() to Fivemanage's upload endpoints.
+-- FiveM blocks external fetch calls from NUI by default; without this
+-- the presigned-URL upload fails with "Failed to fetch".
+nui_allow_urls {
+    'https://*.fivemanage.com/*',
+    'https://api.fivemanage.com/*',
+}
+
 files {
     'html/index.html',
     'html/style.css',
