@@ -3,10 +3,10 @@ game 'gta5'
 
 name        'bonez-bodycam_evidence'
 description 'Court Evidence Recording & Playback — addon for bonez-bodycam'
-version     '1.0.0'
+version     '2.0.0'
 author      'Bonez Workshop'
 
-dependency  'bonez-bodycam'
+dependency  'Bonez-Bodycam'
 dependency  'night_ers'
 
 optional_dependency 'oxmysql'
