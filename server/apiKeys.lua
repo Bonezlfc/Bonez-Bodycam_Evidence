@@ -10,4 +10,4 @@
 
 ApiKeys = {}
 
-ApiKeys.Fivemanage = 'YOUR_FIVEMANAGE_VIDEO_API_KEY_HERE'
+ApiKeys.Fivemanage = ''   -- paste your Fivemanage VIDEO API key here

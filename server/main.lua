@@ -74,16 +74,26 @@ end
 local activeSessions = {}
 
 -- ── Event: client requests a new clip to be created ──────────────────────
--- trigger     — 'CALLOUT' | 'TRACKING' | 'WEAPON_FIRED' | 'MANUAL'
--- serviceType — active service label (e.g. 'POLICE')
+-- trigger      — 'CALLOUT' | 'TRACKING' | 'WEAPON_FIRED' | 'MANUAL'
+-- serviceType  — active service label (e.g. 'POLICE')
+-- clientUnitId — player's custom badge / callsign (may be '' if not set)
 RegisterNetEvent('bonez-bodycam_evidence:startClip')
-AddEventHandler('bonez-bodycam_evidence:startClip', function(trigger, serviceType)
+AddEventHandler('bonez-bodycam_evidence:startClip', function(trigger, serviceType, clientUnitId)
     local src = source
 
     if not trigger then return end
     trigger     = tostring(trigger):upper()
     serviceType = tostring(serviceType or 'UNKNOWN'):upper()
-    local unitId     = GetUnitIdentifier(src)
+
+    -- Use the player's custom unit ID if they have one set, otherwise fall back
+    -- to their account identifier (discord / fivem / license etc. per config).
+    local unitId
+    if type(clientUnitId) == 'string' and clientUnitId ~= '' then
+        unitId = clientUnitId:sub(1, 20)   -- cap length to prevent abuse
+    else
+        unitId = GetUnitIdentifier(src)
+    end
+
     local playerName = GetPlayerName(src) or ''
 
     local clipId    = GenerateUUID()

@@ -53,9 +53,13 @@ end
 
 -- Requests server to create a clip record and returns the assigned clipId
 -- via the 'bonez-bodycam_evidence:clipStartAck' event.
+-- Also passes the player's current unit ID so the server tags the clip
+-- with their badge / callsign instead of the raw identifier.
 local function RequestClipStart(trigger, serviceType)
     awaitingClipId = true
-    TriggerServerEvent('bonez-bodycam_evidence:startClip', trigger, serviceType)
+    local ok, uid = pcall(function() return exports['bonez-bodycam']:getUnitId() end)
+    local unitId  = (ok and type(uid) == 'string' and uid ~= '') and uid or ''
+    TriggerServerEvent('bonez-bodycam_evidence:startClip', trigger, serviceType, unitId)
 end
 
 -- ── Auto-overlay toggle ────────────────────────────────────────────────────

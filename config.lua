@@ -6,7 +6,7 @@ Config = {}
 -- ── Debug ──────────────────────────────────────────────────────────────────
 -- Set to true to print state transitions and upload events to the F8 / txAdmin console.
 -- Leave false on production.
-Config.Debug = false
+Config.Debug = true
 
 -- ── Keybind ────────────────────────────────────────────────────────────────
 Config.DefaultKey   = 'F9'       -- Default key for /evidence command (rebindable in FiveM Settings)
@@ -36,14 +36,13 @@ Config.ClipsPerUnit = 20  -- max clips stored per unit ID; oldest are deleted wh
 -- ── Job permissions (validated server-side only) ───────────────────────────
 -- Any player whose framework job name matches a value here can view evidence.
 Config.AuthorizedJobs = {
-    'police',   -- replace with your framework's job name(s)
-    'da',
+    -- Add your framework's job name(s) here, e.g. 'police', 'sheriff', 'da'
 }
 
 -- Admin jobs — can delete clips in addition to viewing.
 -- txAdmin / server ACE 'command' permission always grants admin access regardless.
 Config.AdminJobs = {
-    'admin',    -- replace with your framework's admin job name(s)
+    -- Add your framework's admin job name(s) here, e.g. 'admin', 'superadmin'
 }
 
 -- ── Unit identifier ────────────────────────────────────────────────────────
@@ -56,32 +55,15 @@ Config.AdminJobs = {
 --   'steam'   — Steam hex ID           (e.g. 1100001096ff9a3)
 --   'xbl'     — Xbox Live ID
 --   'live'    — Microsoft Live ID
-Config.UnitIdentifierType = 'discord'
+Config.UnitIdentifierType = 'fivem'   -- 'fivem' | 'discord' | 'license' | 'steam'
 
 -- ── Service type resolver ───────────────────────────────────────────────────
 -- Returns a string label for the officer's current service/department.
 -- This is stored with every clip for evidence records.
 --
--- Pick ONE option and uncomment it. Delete the others.
--- Tip: Option D uses the bonez-bodycam GetActiveServiceType() helper which
--- already respects both ERS data and the player's manual service type setting.
+-- Uses the bonez-bodycam export which already handles priority:
+--   ERS active service → player's manually-set service type → nil
 Config.GetServiceType = function()
-
-    -- Option A — Static value (simplest). Replace with your department name.
-    return 'YOUR_DEPARTMENT'
-
-    -- Option B — ESX job label
-    -- local ESX = exports['es_extended']:getSharedObject()
-    -- local ply = ESX.GetPlayerData()
-    -- return (ply and ply.job and ply.job.label) or 'UNKNOWN'
-
-    -- Option C — QBCore job label
-    -- local QBCore = exports['qb-core']:GetCoreObject()
-    -- local ply = QBCore.Functions.GetPlayerData()
-    -- return (ply and ply.job and ply.job.label) or 'UNKNOWN'
-
-    -- Option D — night_ers service type export
-    -- local ok, svc = pcall(function() return exports['night_ers']:getServiceType() end)
-    -- return (ok and svc) or 'UNKNOWN'
-
+    local ok, svc = pcall(function() return exports['bonez-bodycam']:getActiveServiceType() end)
+    return (ok and type(svc) == 'string' and svc ~= '') and svc or 'UNKNOWN'
 end
